@@ -19,7 +19,7 @@ def get_news():
 def generate_report(news_text):
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
-        model="claude-3-5-sonnet-20240620",
+        model="claude-3-5-sonnet-latest",
         max_tokens=4000,
         messages=[{"role": "user", "content": f"以下の最新ニュースを元に、経営者向けの補助金・融資レポートを美しいHTML（index.html）として出力してください。ダッシュボード形式を希望します。スタイルはCSSでモダンに整えてください。なお、HTMLコードのみを出力し、説明文は不要です。\n\n{news_text}"}]
     )
