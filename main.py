@@ -10,47 +10,70 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 
 def get_news():
     print("--- Google検索を開始します ---")
-    url = f"https://www.googleapis.com/customsearch/v1?key={GOOGLE_API_KEY}&cx={GOOGLE_CSE_ID}&q=融資+補助金+最新+ニュース"
+    # 検索ワードを広げ、かつ日本語の検索結果を優先します
+    query = "補助金 融資 助成金 中小企業 最新 2026"
+    url = f"https://www.googleapis.com/customsearch/v1?key={GOOGLE_API_KEY}&cx={GOOGLE_CSE_ID}&q={query}&hl=ja"
+    
     try:
         response = requests.get(url)
-        response.raise_for_status()
-        items = response.json().get("items", [])
-        print(f"検索成功: {len(items)}件の記事を見つけました")
+        data = response.json()
+        
+        if "error" in data:
+            print(f"Google APIエラー: {data['error']['message']}")
+            return None
+            
+        items = data.get("items", [])
+        if not items:
+            return None
+            
         text = ""
         for item in items:
-            text += f"タイトル: {item['title']}\nリンク: {item['link']}\n概要: {item['snippet']}\n\n"
+            text += f"タイトル: {item['title']}\nURL: {item['link']}\n概要: {item['snippet']}\n\n"
         return text
     except Exception as e:
-        print(f"【Google検索エラー】: {e}")
+        print(f"通信エラー: {e}")
         return None
 
 def generate_report(news_text):
     print("--- Claudeによるレポート生成を開始します ---")
-    if not news_text:
-        return "ニュースが取得できませんでした。"
+    
+    # 指示出し（プロンプト）をよりプロフェッショナルに強化
+    prompt_content = f"""
+    あなたは優秀な経営コンサルタントです。
+    以下の最新ニュースをもとに、中小企業の経営者が今すぐ役立てられる「日刊・補助金融資レポート」を作成してください。
+
+    【ニュース内容】
+    {news_text if news_text else "最新ニュースは取得されませんでしたが、現在の日本の一般的な補助金・融資のトレンドに基づいたアドバイスを作成してください。"}
+
+    【出力条件】
+    1. HTMLファイル(index.html)として出力してください。
+    2. CSSを使用して、モダンで高級感のあるデザインにしてください（ダークモード対応や青系の配色が好ましい）。
+    3. 各ニュースには必ず元記事へのリンクを貼ってください。
+    4. 「今、経営者が取るべきアクション」という項目を最後に含めてください。
+    5. HTMLコード（<!DOCTYPE html>から始まる）のみを出力し、前後の説明文は一切不要です。
+    """
     
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     try:
-        # どのティアでも確実に使える「haiku」モデルでテストします
         message = client.messages.create(
             model="claude-3-haiku-20240307",
-            max_tokens=2000,
-            messages=[{"role": "user", "content": f"以下の最新ニュースを元に、経営者向けの補助金・融資レポートをHTML形式で出力してください。説明文は不要です。\n\n{news_text}"}]
+            max_tokens=3000,
+            messages=[{"role": "user", "content": prompt_content}]
         )
-        print("レポート作成に成功しました！")
-        return message.content[0].text
+        # AIがたまにMarkdownの ```html などを付けてしまうのを防ぐ処理
+        content = message.content[0].text
+        if "```html" in content:
+            content = content.split("```html")[1].split("```")[0]
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0]
+        return content.strip()
     except Exception as e:
-        print(f"【Anthropic APIエラー】: {e}")
-        print("※APIキーが正しいか、クレジット残高があるか確認してください。")
+        print(f"Anthropicエラー: {e}")
         sys.exit(1)
 
-# メイン処理
-try:
-    news = get_news()
-    html_content = generate_report(news)
-    with open("index.html", "w", encoding="utf-8") as f:
-        f.write(html_content)
-    print("すべての処理が正常に完了しました。")
-except Exception as e:
-    print(f"予期せぬエラー: {e}")
-    sys.exit(1)
+# 実行
+news = get_news()
+html_content = generate_report(news)
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
+print("完了しました。")
