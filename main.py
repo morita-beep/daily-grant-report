@@ -37,7 +37,7 @@ def get_news():
 def generate_report(news_text):
     print("--- Claudeによるレポート生成を開始します ---")
     
-    # 指示出し（プロンプト）をよりプロフェッショナルに強化
+    # ニュース内容に応じたプロンプト
     prompt_content = f"""
     あなたは優秀な経営コンサルタントです。
     以下の最新ニュースをもとに、中小企業の経営者が今すぐ役立てられる「日刊・補助金融資レポート」を作成してください。
@@ -55,13 +55,14 @@ def generate_report(news_text):
     
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     try:
+        # ご指定の最新モデルを使用
         message = client.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=3000,
             messages=[{"role": "user", "content": prompt_content}]
         )
-        # AIがたまにMarkdownの ```html などを付けてしまうのを防ぐ処理
         content = message.content[0].text
+        # 余計なマークダウン記号を除去
         if "```html" in content:
             content = content.split("```html")[1].split("```")[0]
         elif "```" in content:
