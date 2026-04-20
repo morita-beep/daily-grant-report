@@ -8,7 +8,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 
 def get_available_model():
     # 常に最新のモデルを使用するように設定
-    return "claude-3-5-sonnet-20241022"
+    return "claude-3-5-sonnet-latest"
 
 def generate_report():
     target_model = get_available_model()
