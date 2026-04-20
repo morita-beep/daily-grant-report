@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>株式会社HONEST 支援制度レポート</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;background:#f0f2f5;color:#333;}
+header{background:#0d1b4b;color:white;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;}
+.header-left{display:flex;align-items:center;gap:14px;}
+header img{height:56px;}
+header h1{font-size:1.4rem;}
+.date-badge{background:white;color:#0d1b4b;padding:6px 14px;border-radius:4px;font-size:0.85rem;font-weight:bold;}
+.search-box{background:white;margin:20px auto;max-width:960px;border-radius:8px;padding:20px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.search-box h2{font-size:1rem;margin-bottom:12px;color:#0d1b4b;}
+.search-row{display:flex;gap:10px;}
+.search-row input{flex:1;padding:10px 14px;border:1px solid #ccc;border-radius:4px;font-size:0.95rem;}
+.search-row button{background:#0d1b4b;color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;font-size:0.95rem;}
+#search-result{margin-top:14px;padding:14px;background:#f8f9ff;border-left:4px solid #0d1b4b;border-radius:4px;display:none;white-space:pre-wrap;line-height:1.7;}
+.emergency{background:#fff0f0;border:2px solid #e53e3e;border-radius:8px;padding:14px 18px;margin:16px auto;max-width:960px;}
+.emergency-title{color:#e53e3e;font-weight:bold;margin-bottom:6px;}
+.tabs{max-width:960px;margin:0 auto;display:flex;gap:4px;flex-wrap:wrap;padding:0 4px;}
+.tab-btn{background:#dde3f0;border:none;padding:10px 18px;border-radius:6px 6px 0 0;cursor:pointer;font-size:0.88rem;color:#555;}
+.tab-btn.active{background:#0d1b4b;color:white;}
+.tab-content{display:none;max-width:960px;margin:0 auto 30px;background:white;border-radius:0 8px 8px 8px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.tab-content h2{font-size:1.2rem;color:#0d1b4b;border-left:4px solid #0d1b4b;padding-left:10px;margin-bottom:18px;}
+.card{border:1px solid #e0e5f0;border-radius:6px;padding:14px 16px;margin-bottom:14px;background:#fafbff;}
+.card-title{font-weight:bold;font-size:0.95rem;margin-bottom:6px;color:#0d1b4b;}
+.card-body{font-size:0.88rem;color:#555;line-height:1.8;margin-bottom:8px;}
+.card-link{font-size:0.82rem;color:#2563eb;text-decoration:none;}
+.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+.summary-section{background:#f0f4ff;border-radius:6px;padding:14px;}
+.summary-section h3{color:#0d1b4b;font-size:0.95rem;margin-bottom:8px;}
+.advice-box{background:#f0f4ff;border-radius:6px;padding:16px;margin-bottom:14px;}
+.advice-box h3{color:#0d1b4b;margin-bottom:8px;}
+.advice-box ul{padding-left:18px;line-height:1.8;font-size:0.9rem;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <img src="rogo.png" alt="HONEST">
+    <h1>株式会社HONEST</h1>
+  </div>
+  <div class="date-badge" id="today-date"></div>
+</header>
+
+<div class="search-box">
+  <h2>🔍 AI制度検索</h2>
+  <div class="search-row">
+    <input type="text" id="search-input" placeholder="制度名を入力して検索（例：ものづくり補助金）">
+    <button onclick="askAI()">AIに質問する</button>
+  </div>
+  <div id="search-result"></div>
+</div>
+
+<div class="emergency">
+  <div class="emergency-title">⚠️ 緊急情報：中東情勢による中小企業支援</div>
+  中小企業庁は中東情勢・原油価格高騰の影響を受ける事業者向けにセーフティネット貸付の要件を緩和。
+  売上減少の数値要件なしでも資金繰りに支障がある場合は融資対象。（2026年3月27日発表）
+  相談窓口：日本政策金融公庫 / 信用保証協会 / 各都道府県窓口
+</div>
+
+<div class="tabs">
+  <button class="tab-btn" id="btn1" onclick="showTab(1)">①エグゼクティブサマリー</button>
+  <button class="tab-btn" id="btn2" onclick="showTab(2)">②融資（最重要）</button>
+  <button class="tab-btn" id="btn3" onclick="showTab(3)">③補助金</button>
+  <button class="tab-btn" id="btn4" onclick="showTab(4)">④助成金</button>
+  <button class="tab-btn" id="btn5" onclick="showTab(5)">⑤税制</button>
+  <button class="tab-btn" id="btn6" onclick="showTab(6)">⑥コンサルティング提言</button>
+</div>
+
+<div class="tab-content" id="tab1">
+  <h2>エグゼクティブサマリー</h2>
+  <div class="summary-grid">
+    <div class="summary-section">
+      <h3>🏦 融資（最重要）</h3>
+      中東情勢対応のセーフティネット貸付要件緩和。日本政策金融公庫・信用保証協会が対応中。上限4,800万円。
+    </div>
+    <div class="summary-section">
+      <h3>💰 補助金</h3>
+      ものづくり補助金（上限4,000万円）・IT導入補助金（上限450万円）・小規模事業者持続化補助金（上限250万円）が公募中。
+    </div>
+    <div class="summary-section">
+      <h3>👥 助成金</h3>
+      キャリアアップ助成金（57万円〜）・業務改善助成金（最大600万円）・人材開発支援助成金（経費45〜75%）が活用可能。
+    </div>
+    <div class="summary-section">
+      <h3>📊 税制</h3>
+      賃上げ促進税制（最大45%控除）・中小企業経営強化税制（即時償却）・研究開発税制（最大17%控除）が適用可能。
+    </div>
+  </div>
+</div>
+
+<div class="tab-content" id="tab2">
+  <h2>🏦 融資・資金繰り支援（最重要）</h2>
+  <div class="card">
+    <div class="card-title">⚠️ セーフティネット貸付（経営環境変化対応資金）【緊急・要件緩和中】</div>
+    <div class="card-body">
+      対象：中東情勢・原油高騰の影響を受ける中小企業<br>
+      融資上限：4,800万円<br>
+      金利：基準金利より引下げあり（一定要件を満たす場合）<br>
+      要件：売上減少数値要件なしでも資金繰りに支障があれば対象（2026年3月27日〜緩和中）<br>
+      注意点：通常は売上高5%以上減少が要件だが現在は緩和中<br>
+      申請窓口：日本政策金融公庫 各支店
+    </div>
+    <a href="https://www.jfc.go.jp/" target="_blank" class="card-link">日本政策金融公庫 公式サイト →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">日本政策金融公庫 一般貸付</div>
+    <div class="card-body">
+      対象：中小企業・小規模事業者全般<br>
+      融資上限：4,800万円<br>
+      返済期間：設備資金10年・運転資金7年<br>
+      金利：基準金利（変動）<br>
+      特徴：無担保融資枠あり・創業融資も対応<br>
+      注意点：決算書2期分が必要（創業の場合は事業計画書）<br>
+      申請窓口：日本政策金融公庫 各支店
+    </div>
+    <a href="https://www.jfc.go.jp/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">信用保証協会 セーフティネット保証（4号・5号）</div>
+    <div class="card-body">
+      対象：業況悪化・取引先倒産等の影響を受ける中小企業<br>
+      保証枠：別枠2.8億円（一般保証とは別枠で利用可能）<br>
+      要件：売上高が前年比マイナス5%以上（4号）/ 指定業種で売上減（5号）<br>
+      注意点：市区町村の認定書が必要・金融機関経由で申請<br>
+      申請窓口：各都道府県の信用保証協会・取引金融機関
+    </div>
+    <a href="https://www.zenshinhoren.or.jp/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">経営改善計画策定支援（405事業）</div>
+    <div class="card-body">
+      対象：金融機関と条件変更（リスケ）交渉中の中小企業<br>
+      補助：専門家費用の2/3（上限200万円）<br>
+      内容：認定支援機関と連携して経営改善計画を策定<br>
+      注意点：金融機関が支援に同意することが条件<br>
+      申請窓口：中小企業活性化協議会・認定経営革新等支援機関
+    </div>
+    <a href="https://www.chusho.meti.go.jp/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">新事業育成資金</div>
+    <div class="card-body">
+      対象：新事業・新分野進出を行う中小企業<br>
+      融資上限：7.2億円（直接貸付）<br>
+      返済期間：長期（設備20年以内）<br>
+      要件：新規性・成長性のある事業計画が必要<br>
+      申請窓口：日本政策金融公庫 各支店
+    </div>
+    <a href="https://www.jfc.go.jp/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+</div>
+
+<div class="tab-content" id="tab3">
+  <h2>💰 補助金</h2>
+  <div class="card">
+    <div class="card-title">ものづくり補助金</div>
+    <div class="card-body">
+      上限額：最大4,000万円 / 補助率：1/2〜2/3<br>
+      対象：革新的製品・サービス開発、生産プロセス改善を行う中小企業<br>
+      対象経費：機械装置・システム構築費・技術導入費・専門家経費等<br>
+      申請要件：付加価値額年率3%以上向上・給与支給総額年率1.5%以上向上<br>
+      注意点：設備投資が主体・事業計画書の作成が必須・採択後に発注すること<br>
+      申請窓口：ものづくり補助金総合サイト
+    </div>
+    <a href="https://portal.monodukuri-hojo.jp/" target="_blank" class="card-link">ものづくり補助金総合サイト →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">IT導入補助金</div>
+    <div class="card-body">
+      上限額：最大450万円 / 補助率：1/2〜3/4<br>
+      対象：ITツール導入（ソフトウェア・クラウド・インボイス対応等）<br>
+      対象経費：ソフトウェア費・クラウド利用料・導入関連費<br>
+      申請要件：IT導入支援事業者と共同申請が必須<br>
+      注意点：導入後の実績報告が必要・ハードウェアは対象外<br>
+      申請窓口：IT導入補助金事務局（IT導入支援事業者経由）
+    </div>
+    <a href="https://it-hojo.jp/" target="_blank" class="card-link">IT導入補助金公式サイト →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">小規模事業者持続化補助金</div>
+    <div class="card-body">
+      上限額：最大250万円 / 補助率：2/3<br>
+      対象：販路開拓・広告宣伝・Webサイト制作・設備導入等<br>
+      申請要件：商工会・商工会議所の支援を受けた事業計画書の作成<br>
+      対象者：小規模事業者（商業・サービス業5人以下、製造業等20人以下）<br>
+      注意点：補助事業終了後も3〜5年の事業継続報告が必要<br>
+      申請窓口：各地商工会・商工会議所
+    </div>
+    <a href="https://r3.jizokukahojokin.info/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">中小企業省力化投資補助金</div>
+    <div class="card-body">
+      上限額：最大1,500万円 / 補助率：1/2<br>
+      対象：カタログ掲載製品（IoT・ロボット・自動化機器等）の導入<br>
+      申請要件：簡易申請で利用可能・人手不足解消が目的<br>
+      注意点：カタログ掲載製品のみが対象・汎用品は不可<br>
+      申請窓口：省力化投資補助金事務局
+    </div>
+    <a href="https://www.chusho.meti.go.jp/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">事業再構築補助金</div>
+    <div class="card-body">
+      上限額：最大1.5億円 / 補助率：1/2〜2/3<br>
+      対象：新分野展開・業態転換・事業転換等に取り組む中小企業<br>
+      申請要件：認定経営革新等支援機関と事業計画策定・売上高減少要件あり<br>
+      注意点：大規模な事業転換が前提・審査が厳しい<br>
+      申請窓口：事業再構築補助金事務局
+    </div>
+    <a href="https://jigyou-saikouchiku.go.jp/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+</div>
+
+<div class="tab-content" id="tab4">
+  <h2>👥 助成金</h2>
+  <div class="card">
+    <div class="card-title">キャリアアップ助成金</div>
+    <div class="card-body">
+      支給額：1人あたり最大57万円〜（正社員化コース）<br>
+      対象：非正規雇用労働者を正社員化・処遇改善した事業主<br>
+      受給要件：6ヶ月以上雇用後に正社員転換・就業規則の整備が必要<br>
+      注意点：転換前後で賃金3%以上アップが条件・転換日から6ヶ月後に申請<br>
+      申請手続き：転換後6ヶ月の賃金支払い後、ハローワークへ申請<br>
+      申請窓口：各都道府県労働局・ハローワーク
+    </div>
+    <a href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/part_haken/jigyounushi/career.html" target="_blank" class="card-link">厚生労働省 公式サイト →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">業務改善助成金</div>
+    <div class="card-body">
+      支給額：最大600万円<br>
+      対象：最低賃金引上げと設備投資をセットで実施した事業主<br>
+      受給要件：事業場内最低賃金を30円以上引き上げ<br>
+      対象経費：設備投資・機械導入・研修・外部専門家活用費等<br>
+      注意点：賃上げ前に交付申請が必要・事前着手は不可<br>
+      申請窓口：各都道府県労働局
+    </div>
+    <a href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/roudoukijun/zigyonushi/shienjigyou/03.html" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">人材開発支援助成金</div>
+    <div class="card-body">
+      支給額：経費の45〜75%（訓練種別により異なる）<br>
+      対象：従業員の職業訓練・教育訓練を実施した事業主<br>
+      受給要件：厚労省が定める訓練計画の事前届出が必要<br>
+      注意点：OFF-JTとOJTで助成率が異なる・訓練前に計画届出必須<br>
+      申請手続き：訓練開始1ヶ月前までに訓練計画届を提出<br>
+      申請窓口：各都道府県労働局・ハローワーク
+    </div>
+    <a href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyou/kyufukin/d01-1.html" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">両立支援等助成金</div>
+    <div class="card-body">
+      支給額：28.5万円〜（コースにより異なる）<br>
+      対象：育児・介護と仕事の両立支援策を実施した事業主<br>
+      受給要件：育児休業・介護休業取得の環境整備<br>
+      注意点：就業規則への規定が必要<br>
+      申請窓口：各都道府県労働局
+    </div>
+    <a href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kodomo/kodomo_kosodate/jiritsushien/index.html" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+</div>
+
+<div class="tab-content" id="tab5">
+  <h2>📊 税制優遇</h2>
+  <div class="card">
+    <div class="card-title">賃上げ促進税制</div>
+    <div class="card-body">
+      控除額：給与増加額の最大45%を法人税から税額控除<br>
+      対象：中小企業者等（資本金1億円以下等）<br>
+      適用要件：前年度比で給与等支給額を1.5%以上増加（控除率15%〜）<br>
+      上乗せ：教育訓練費増加・育児休業取得率等で上乗せあり<br>
+      注意点：控除しきれない額は5年間繰越可能<br>
+      適用期限：2026年3月末（延長見込み）
+    </div>
+    <a href="https://www.meti.go.jp/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">中小企業経営強化税制</div>
+    <div class="card-body">
+      控除額：即時償却 または 取得価額の10%税額控除<br>
+      対象：中小企業者等が一定の設備を取得した場合<br>
+      対象設備：機械装置・工具・器具備品・建物附属設備・ソフトウェア<br>
+      適用要件：経営力向上計画の認定が必要（事前申請）<br>
+      注意点：計画認定前に取得した設備は対象外<br>
+      適用期限：2027年3月末まで延長
+    </div>
+    <a href="https://www.chusho.meti.go.jp/keiei/kyoka/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">研究開発税制</div>
+    <div class="card-body">
+      控除額：試験研究費の最大17%を法人税から税額控除<br>
+      対象：試験研究を行う中小企業<br>
+      控除上限：法人税額の35%（中小企業の場合）<br>
+      注意点：試験研究費の増減に応じて控除率が変動<br>
+      申請方法：確定申告時に別表で申告（事前申請不要）
+    </div>
+    <a href="https://www.meti.go.jp/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+  <div class="card">
+    <div class="card-title">中小企業投資促進税制</div>
+    <div class="card-body">
+      控除額：取得価額の30%特別償却 または 7%税額控除<br>
+      対象：機械装置（160万円以上）・ソフトウェア（70万円以上）等<br>
+      適用要件：青色申告法人・資本金3,000万円以下<br>
+      注意点：経営強化税制との選択適用<br>
+      適用期限：2027年3月末まで
+    </div>
+    <a href="https://www.chusho.meti.go.jp/" target="_blank" class="card-link">詳細を見る →</a>
+  </div>
+</div>
+
+<div class="tab-content" id="tab6">
+  <h2>💼 コンサルティング提言</h2>
+  <div class="advice-box">
+    <h3>🚨 今すぐ確認すべき案件</h3>
+    <ul>
+      <li>中東情勢の影響を受けている顧客 → セーフティネット貸付（要件緩和中）を即座に提案</li>
+      <li>原材料・エネルギーコスト上昇の顧客 → 業務改善助成金と組み合わせて提案</li>
+      <li>設備投資を検討中の顧客 → ものづくり補助金＋経営強化税制の併用を検討</li>
+      <li>資金繰りが厳しい顧客 → セーフティネット保証＋405事業の組み合わせを提案</li>
+    </ul>
+  </div>
+  <div class="advice-box">
+    <h3>📋 今月の重点提案項目</h3>
+    <ul>
+      <li>賃上げ実施予定の顧客 → 賃上げ促進税制＋キャリアアップ助成金を同時提案</li>
+      <li>IT化・DX推進の顧客 → IT導入補助金＋経営強化税制（ソフトウェア）の併用</li>
+      <li>採用・人材育成の顧客 → 人材開発支援助成金＋両立支援助成金を確認</li>
+      <li>新事業展開を検討中の顧客 → 事業再構築補助金＋新事業育成資金の組み合わせ</li>
+    </ul>
+  </div>
+  <div class="advice-box">
+    <h3>💡 補助金・助成金の併用ポイント</h3>
+    <ul>
+      <li>ものづくり補助金＋経営強化税制：設備投資に対して補助金と税制優遇の両方を活用可能</li>
+      <li>キャリアアップ助成金＋賃上げ促進税制：正社員化と賃上げで助成金と税控除を同時取得</li>
+      <li>IT導入補助金＋経営強化税制：ITツール導入で補助金と税制優遇の併用が可能</li>
+    </ul>
+  </div>
+  <div class="advice-box">
+    <h3>⚠️ 注意事項</h3>
+    <ul>
+      <li>本レポートの情報は作成時点のものです。申請前に必ず公式サイトで最新情報を確認してください</li>
+      <li>補助金・助成金は原則として事前申請が必要です。着手後の申請は認められません</li>
+      <li>複数制度の併用可否は制度ごとに異なります。必ず各窓口に確認してください</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+function showTab(num) {
+  for (var i = 1; i <= 6; i++) {
+    document.getElementById('tab' + i).style.display = 'none';
+    document.getElementById('btn' + i).classList.remove('active');
+  }
+  document.getElementById('tab' + num).style.display = 'block';
+  document.getElementById('btn' + num).classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var d = new Date();
+  var ds = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+  document.getElementById('today-date').textContent = ds + '時点の情報';
+  showTab(1);
+});
+
+async function askAI() {
+  var query = document.getElementById('search-input').value.trim();
+  if (!query) { alert('制度名を入力してください'); return; }
+  var el = document.getElementById('search-result');
+  el.style.display = 'block';
+  el.textContent = 'AIが調査中...';
+  try {
+    var res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': 'REPLACE_API_KEY',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: '中小企業の財務コンサルタントとして、次の制度について詳しく教えてください。対象者・金額・申請条件・注意点・申請窓口を箇条書きで: ' + query
+        }]
+      })
+    });
+    var data = await res.json();
+    if (data.content && data.content[0]) {
+      el.textContent = data.content[0].text;
+    } else {
+      el.textContent = '回答を取得できませんでした。';
+    }
+  } catch(e) {
+    el.textContent = 'エラー: ' + e.message;
+  }
+}
+</script>
+</body>
+</html>
