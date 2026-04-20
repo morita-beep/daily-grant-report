@@ -1,11 +1,9 @@
-name: daily-grant-report
+name: weekly-grant-report
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 23 * * *'  # 毎日朝8時（日本時間）
-  push:
-    branches: [main]
+    - cron: '0 23 * * 0'
 
 permissions:
   contents: read
