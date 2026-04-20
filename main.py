@@ -144,13 +144,26 @@ def generate_report():
 
 7. 完全なHTML（<!DOCTYPE html>から</html>まで）のみ出力
 
+8. タブのJavaScriptは必ず以下の形式で実装する：
+   <script>
+   function showTab(tabId) {{
+     document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+     document.getElementById(tabId).style.display = 'block';
+     event.target.classList.add('active');
+   }}
+   window.onload = function() {{
+     document.getElementById('tab1').style.display = 'block';
+   }};
+   </script>
+
 </html>で終わるコードのみ出力してください。"""
 
     client = anthropic.Anthropic(api_key=api_key)
     try:
         message = client.messages.create(
             model=target_model,
-            max_tokens=4000,
+            max_tokens=8000,
             messages=[{"role": "user", "content": prompt}]
         )
         raw = message.content[0].text
