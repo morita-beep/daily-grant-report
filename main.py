@@ -1,56 +1,73 @@
 import os
 import requests
-from anthropic import Anthropic
+import anthropic
 import sys
 
-# 設定
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-GOOGLE_CSE_ID = os.environ.get("GOOGLE_CSE_ID")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+# 鍵の読み込み
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 
-def get_news():
-    print("--- Google検索を開始します ---")
-    url = f"https://www.googleapis.com/customsearch/v1?key={GOOGLE_API_KEY}&cx={GOOGLE_CSE_ID}&q=融資+補助金+最新+ニュース"
+def get_available_model():
+    print("--- 利用可能モデルの確認 ---")
+    # 直接APIを叩いて、今この鍵で見えているモデルの一覧を取得します
+    url = "https://api.anthropic.com/v1/models"
+    headers = {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+    }
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        items = response.json().get("items", [])
-        print(f"検索成功: {len(items)}件の記事を見つけました")
-        text = ""
-        for item in items:
-            text += f"タイトル: {item['title']}\nリンク: {item['link']}\n概要: {item['snippet']}\n\n"
-        return text
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            models = [m['id'] for m in response.json().get('data', [])]
+            print(f"発見されたモデル: {models}")
+            # 2026年の推奨順に候補を並べ、リストにあるものを採用
+            priority = ["claude-sonnet-4-6", "claude-opus-4-7", "claude-haiku-4-5-20251001", "claude-3-7-sonnet-latest"]
+            for p in priority:
+                if p in models:
+                    return p
+            return models[0] if models else None
     except Exception as e:
-        print(f"【Google検索エラー】: {e}")
-        return None
+        print(f"モデル一覧の取得に失敗: {e}")
+    # 取得失敗時の最終フォールバック
+    return "claude-sonnet-4-6"
 
-def generate_report(news_text):
-    print("--- Claudeによるレポート生成を開始します ---")
-    if not news_text:
-        return "ニュースが取得できませんでした。"
+def generate_report():
+    print("--- レポート生成プロセス開始 ---")
+    if not ANTHROPIC_API_KEY:
+        sys.exit("APIキーが設定されていません。")
+
+    # 1. 今使えるモデルを特定
+    target_model = get_available_model()
+    print(f"使用決定モデル: {target_model}")
+
+    # 2. クライアント作成（組織ID指定なしの最小構成）
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    prompt = """
+    日本の中小企業経営者向けに、以下の4ジャンルを網羅した日刊レポートをHTMLで作成してください。
+    1.補助金 2.助成金 3.融資 4.税制優遇
+    2026年の最新トレンドに基づき、専門的かつ読みやすいコラム形式にしてください。
+    出力は index.html 用のコードのみ。CSSで高級感を出してください。
+    """
+
     try:
-        # どのティアでも確実に使える「haiku」モデルでテストします
         message = client.messages.create(
-            model="claude-3-haiku-20240307",
-            max_tokens=2000,
-            messages=[{"role": "user", "content": f"以下の最新ニュースを元に、経営者向けの補助金・融資レポートをHTML形式で出力してください。説明文は不要です。\n\n{news_text}"}]
+            model=target_model,
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}]
         )
-        print("レポート作成に成功しました！")
-        return message.content[0].text
+        content = message.content[0].text
+        # 余計な装飾を除去
+        if "```html" in content:
+            content = content.split("```html")[1].split("```")[0]
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0]
+        return content.strip()
     except Exception as e:
-        print(f"【Anthropic APIエラー】: {e}")
-        print("※APIキーが正しいか、クレジット残高があるか確認してください。")
+        print(f"レポート生成エラー: {e}")
         sys.exit(1)
 
-# メイン処理
-try:
-    news = get_news()
-    html_content = generate_report(news)
-    with open("index.html", "w", encoding="utf-8") as f:
-        f.write(html_content)
-    print("すべての処理が正常に完了しました。")
-except Exception as e:
-    print(f"予期せぬエラー: {e}")
-    sys.exit(1)
+# 実行と保存
+html_content = generate_report()
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
+print("完了しました！GitHub Pagesを確認してください。")
