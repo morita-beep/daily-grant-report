@@ -51,19 +51,30 @@ def collect_latest_news():
             f"セーフティネット貸付 最新 {year}",
             f"日本政策金融公庫 新制度 {year}",
             "中東情勢 中小企業 融資 支援 最新",
+            f"信用保証協会 保証制度 {year} 最新",
+            f"中小企業 低金利融資 {year}",
         ],
         "補助金": [
             f"補助金 公募開始 中小企業 {ym}",
-            f"ものづくり補助金 {year} 最新",
-            f"IT導入補助金 {year} 申請",
+            f"ものづくり補助金 {year} 最新 要件",
+            f"IT導入補助金 {year} 申請 要件",
+            f"事業再構築補助金 {year} 最新",
+            f"小規模事業者持続化補助金 {year}",
+            f"省力化投資補助金 {year}",
         ],
         "助成金": [
             f"助成金 中小企業 {ym} 新設",
-            f"雇用助成金 最新 {year}",
+            f"雇用調整助成金 {year} 最新",
+            f"キャリアアップ助成金 {year} 要件",
+            f"業務改善助成金 {year} 申請",
+            f"人材開発支援助成金 {year}",
         ],
         "税制": [
-            f"中小企業 税制改正 {year}",
+            f"中小企業 税制改正 {year} 詳細",
             f"税制優遇 延長 新設 {year}",
+            f"賃上げ促進税制 {year} 要件",
+            f"中小企業経営強化税制 {year}",
+            f"研究開発税制 中小企業 {year}",
         ],
     }
 
@@ -71,11 +82,11 @@ def collect_latest_news():
     for genre, qs in queries.items():
         genre_news = []
         for q in qs:
-            items = search_google(q, google_api_key, google_cse_id, num=3)
+            items = search_google(q, google_api_key, google_cse_id, num=5)
             genre_news.extend(items)
-            if len(genre_news) >= 6:
+            if len(genre_news) >= 15:
                 break
-        results[genre] = genre_news[:6]
+        results[genre] = genre_news[:15]
     return results
 
 def get_available_model(api_key):
@@ -119,43 +130,77 @@ def generate_report():
 {news_text}
 
 【デザイン・構成の要件】
-1. ヘッダーに会社ロゴを表示する
-   - ロゴ画像はリポジトリのルートにある「rogo.png」を使う
-   - <img src="rogo.png" alt="HONEST" style="height:60px;">
-   - ロゴの右に「株式会社HONEST」と社名を表示
 
-2. タブ切り替え機能を実装する（JavaScriptで動作）
-   - タブ①「エグゼクティブサマリー」：全ジャンルの要点を1画面で
-   - タブ②「融資（最重要）」：融資・資金繰り情報を詳しく
-   - タブ③「補助金」：補助金情報
-   - タブ④「助成金」：助成金情報
-   - タブ⑤「税制」：税制優遇情報
-   - タブ⑥「コンサルティング提言」：顧客提案のポイントまとめ
-   - デフォルトはタブ①を表示
-   - タブをクリックすると必ずそのタブの内容が表示される
+1. ヘッダー
+   - <img src="rogo.png" alt="HONEST" style="height:60px;"> でロゴ表示
+   - ロゴ右に「株式会社HONEST」と表示
+   - 右端に「{today_str}時点の情報」と表示
 
-3. 各タブに検索情報の具体的な内容・金額・期限・URLリンクを記載
+2. AI検索機能（ページ上部に設置）
+   以下のHTMLとJavaScriptを必ず実装する：
+   - テキスト入力欄（placeholder：「制度名を入力して検索（例：ものづくり補助金）」）
+   - 「AIに質問する」ボタン
+   - 結果表示エリア
+   - JavaScriptでAnthropicAPIを呼び出す：
+     fetch('https://api.anthropic.com/v1/messages', {{
+       method: 'POST',
+       headers: {{
+         'Content-Type': 'application/json',
+         'x-api-key': '{{{{ANTHROPIC_API_KEY}}}}',
+         'anthropic-version': '2023-06-01',
+         'anthropic-dangerous-direct-browser-access': 'true'
+       }},
+       body: JSON.stringify({{
+         model: '{target_model}',
+         max_tokens: 1000,
+         messages: [{{role:'user', content: '中小企業の財務コンサルタントとして、次の制度について詳しく教えてください。対象者・金額・申請条件・注意点・申請窓口を箇条書きで: ' + query}}]
+       }})
+     }})
+   - APIキーはHTML内に直接埋め込む（下記の REPLACE_API_KEY の部分）
+   - ローディング中は「AIが調査中...」と表示
+   - 結果は見やすく整形して表示
 
-4. 中東情勢など緊急情報は赤枠で目立たせる
+3. タブ切り替え（6タブ）
+   - ①エグゼクティブサマリー
+   - ②融資（最重要）
+   - ③補助金
+   - ④助成金
+   - ⑤税制
+   - ⑥コンサルティング提言
 
-5. レポート上部に「{today_str}時点の情報」と明記
+4. 各タブの情報量（重要）
+   融資タブ：
+   - 各制度ごとに「融資上限額」「金利」「返済期間」「対象者」「申請条件」「注意点」「窓口」を記載
+   - 中東情勢対応の緊急融資は赤枠で強調
+   
+   補助金タブ：
+   - 各制度ごとに「上限額」「補助率」「対象者」「対象経費」「申請要件」「スケジュール」「注意点」を記載
+   
+   助成金タブ：
+   - 各制度ごとに「支給額」「対象者」「受給要件」「申請手続き」「注意点」を記載
+   
+   税制タブ：
+   - 各制度ごとに「控除額・税額控除率」「対象者」「適用要件」「申請方法」「期限」を記載
 
-6. プロフェッショナルなデザイン（紺色ベース）
-
-7. 完全なHTML（<!DOCTYPE html>から</html>まで）のみ出力
-
-8. タブのJavaScriptは必ず以下の形式で実装する：
+5. タブJS：
    <script>
-   function showTab(tabId) {{
+   function showTab(tabId, btn) {{
      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
      document.getElementById(tabId).style.display = 'block';
-     event.target.classList.add('active');
+     btn.classList.add('active');
    }}
    window.onload = function() {{
      document.getElementById('tab1').style.display = 'block';
+     document.querySelector('.tab-btn').classList.add('active');
    }};
    </script>
+
+6. プロフェッショナルな紺色ベースのデザイン
+
+7. 完全なHTML（<!DOCTYPE html>から</html>まで）のみ出力
+
+重要：APIキーの埋め込み箇所は必ず文字列 REPLACE_API_KEY と書いてください。
 
 </html>で終わるコードのみ出力してください。"""
 
@@ -171,6 +216,10 @@ def generate_report():
                      flags=re.DOTALL | re.IGNORECASE)
         html = re.sub(r'</html>.*$', '</html>', html,
                      flags=re.DOTALL | re.IGNORECASE)
+
+        # REPLACE_API_KEY を実際のAPIキーに置き換える
+        html = html.replace('REPLACE_API_KEY', api_key)
+
         return html
     except Exception as e:
         print(f"APIエラー: {e}")
