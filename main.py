@@ -1,45 +1,39 @@
-name: weekly-grant-report
+import os
+import requests
+import anthropic
+import sys
+import re
 
-on:
-  schedule:
-    - cron: '0 0 * * 1' # 毎週月曜 日本時間朝9時
-  workflow_dispatch: # 手動実行用
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+def get_available_model():
+    # 常に最新のモデルを使用するように設定
+    return "claude-3-5-sonnet-20241022"
 
-jobs:
-  build_and_deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: リポジトリをチェックアウト
-        uses: actions/checkout@v4
+def generate_report():
+    target_model = get_available_model()
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    
+    prompt = "日本の中小企業経営者向けに、1.補助金 2.助成金 3.融資 4.税制優遇の最新情報をまとめた週刊レポートを、1枚の完成されたHTML（CSS込み）で作成してください。出力は<html>から始まるHTMLコードのみにしてください。説明や```記号は一切不要です。"
 
-      - name: Pythonをセットアップ
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
+    try:
+        message = client.messages.create(
+            model=target_model,
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw_content = message.content[0].text
+        
+        # HTML以外の余計な装飾を消去
+        clean_html = re.sub(r'^.*?<html', '<html', raw_content, flags=re.DOTALL | re.IGNORECASE)
+        clean_html = re.sub(r'</html>.*$', '</html>', clean_html, flags=re.DOTALL | re.IGNORECASE)
+        
+        return clean_html
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
-      - name: 依存関係をインストール
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests anthropic
-
-      - name: レポート生成
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python main.py
-
-      - name: Pagesの設定を構成
-        uses: actions/configure-pages@v4
-
-      - name: 生成したHTMLをアップロード
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.' # index.htmlがある場所
-
-      - name: GitHub Pagesにデプロイ
-        id: deployment
-        uses: actions/deploy-pages@v4
+# index.html という名前で保存
+html_content = generate_report()
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
