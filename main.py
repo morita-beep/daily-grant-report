@@ -12,66 +12,6 @@ def get_clean_api_key():
         sys.exit(1)
     return clean
 
-def search_google(query, api_key, cse_id, num=5):
-    url = "https://www.googleapis.com/customsearch/v1"
-    params = {"q": query, "key": api_key, "cx": cse_id, "num": num, "lr": "lang_ja", "dateRestrict": "m1"}
-    try:
-        response = requests.get(url, params=params, timeout=15)
-        if response.status_code == 200:
-            return [{"title": i.get("title",""), "snippet": i.get("snippet",""), "link": i.get("link","")}
-                    for i in response.json().get("items", [])]
-    except Exception as e:
-        print(f"検索エラー: {e}")
-    return []
-
-def collect_latest_news():
-    google_api_key = os.environ.get("GOOGLE_API_KEY", "")
-    google_cse_id = os.environ.get("GOOGLE_CSE_ID", "")
-    if not google_api_key or not google_cse_id:
-        print("警告: Google APIキーが未設定")
-        return {}
-    now = datetime.now()
-    year = now.year
-    ym = now.strftime("%Y年%m月")
-    queries = {
-        "融資": [
-            f"中小企業 緊急融資 資金繰り {ym}",
-            f"セーフティネット貸付 最新 {year}",
-            f"日本政策金融公庫 新制度 {year}",
-            "中東情勢 中小企業 融資 支援 最新",
-            f"信用保証協会 保証制度 {year}",
-        ],
-        "補助金": [
-            f"補助金 公募開始 中小企業 {ym}",
-            f"ものづくり補助金 {year} 最新",
-            f"IT導入補助金 {year} 申請",
-            f"事業再構築補助金 {year}",
-            f"小規模事業者持続化補助金 {year}",
-        ],
-        "助成金": [
-            f"助成金 中小企業 {ym} 新設",
-            f"キャリアアップ助成金 {year} 要件",
-            f"業務改善助成金 {year}",
-            f"人材開発支援助成金 {year}",
-        ],
-        "税制": [
-            f"中小企業 税制改正 {year}",
-            f"賃上げ促進税制 {year} 要件",
-            f"中小企業経営強化税制 {year}",
-            f"研究開発税制 中小企業 {year}",
-        ],
-    }
-    results = {}
-    for genre, qs in queries.items():
-        genre_news = []
-        for q in qs:
-            items = search_google(q, google_api_key, google_cse_id, num=5)
-            genre_news.extend(items)
-            if len(genre_news) >= 10:
-                break
-        results[genre] = genre_news[:10]
-    return results
-
 def get_available_model(api_key):
     url = "https://api.anthropic.com/v1/models"
     headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01"}
@@ -79,7 +19,7 @@ def get_available_model(api_key):
         response = requests.get(url, headers=headers, timeout=15)
         if response.status_code == 200:
             models = [m['id'] for m in response.json().get('data', [])]
-            for p in ["claude-haiku-4-5", "claude-sonnet-4-5", "claude-3-5-sonnet-20241022"]:
+            for p in ["claude-sonnet-4-5", "claude-haiku-4-5", "claude-3-5-sonnet-20241022"]:
                 if p in models:
                     return p
             return models[0] if models else "claude-haiku-4-5"
@@ -87,29 +27,195 @@ def get_available_model(api_key):
         pass
     return "claude-haiku-4-5"
 
-def make_cards(items):
-    if not items:
-        return "<p style='color:#888;'>本日は該当する新着情報がありませんでした。</p>"
-    html = ""
-    for item in items:
-        html += f"""<div style='border:1px solid #dde3f0;border-radius:6px;padding:14px;margin-bottom:12px;background:#fafbff;'>
+def search_google(query, api_key, cse_id, num=3):
+    url = "https://www.googleapis.com/customsearch/v1"
+    params = {"q": query, "key": api_key, "cx": cse_id, "num": num, "lr": "lang_ja", "dateRestrict": "m1"}
+    try:
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code == 200:
+            return [{"title": i.get("title",""), "snippet": i.get("snippet",""), "link": i.get("link","")} for i in response.json().get("items", [])]
+        elif response.status_code in [429, 403]:
+            print("Google検索上限超過 → Anthropic Web検索に切り替えます")
+            return None
+    except Exception as e:
+        print(f"Google検索エラー: {e}")
+    return []
+
+def search_with_anthropic(client, model, query):
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=2000,
+            tools=[{"type": "web_search_20250305", "name": "web_search"}],
+            messages=[{"role": "user", "content": query}]
+        )
+        result = ""
+        for block in response.content:
+            if hasattr(block, 'text'):
+                result += block.text
+        return result
+    except Exception as e:
+        print(f"Anthropic検索エラー: {e}")
+        return ""
+
+def check_google_available(google_api_key, google_cse_id):
+    if not google_api_key or not google_cse_id:
+        return False
+    test = search_google("中小企業 融資", google_api_key, google_cse_id, num=1)
+    if test is None:
+        return False
+    return True
+
+def collect_all_news(client, model, google_available, google_api_key, google_cse_id):
+    now = datetime.now()
+    year = now.year
+    ym = now.strftime("%Y年%m月")
+    results = {}
+
+    # ==========================================
+    # 世界情勢・緊急事態の検索（常にAnthropicを使用）
+    # ==========================================
+    print("世界情勢・緊急事態を調査中...")
+    世界情勢_text = search_with_anthropic(client, model,
+        f"""現在（{ym}）の世界情勢で、日本の中小企業に影響を与える可能性がある重大な出来事を調査してください。
+        以下の観点で調べてください：
+        1. 戦争・地政学リスク（中東・ウクライナ・台湾海峡等）
+        2. 自然災害・パンデミックリスク
+        3. 金融危機・世界恐慌リスク
+        4. 原油・エネルギー価格動向
+        5. 為替・金利動向
+        6. サプライチェーン混乱
+        各項目について、日本の中小企業への具体的な影響と対応策を簡潔にまとめてください。""")
+    results["世界情勢"] = {"mode": "anthropic", "text": 世界情勢_text}
+
+    if google_available:
+        print("Google検索モードで各制度情報を取得中...")
+        queries = {
+            "融資": [
+                f"中小企業 緊急融資 資金繰り {ym}",
+                f"セーフティネット貸付 {year} 最新",
+                "中東情勢 災害 融資 中小企業 緊急支援",
+                f"日本政策金融公庫 {year} 新制度",
+            ],
+            "補助金": [
+                f"補助金 公募 中小企業 {ym}",
+                f"ものづくり補助金 {year}",
+                f"IT導入補助金 {year}",
+                f"緊急 補助金 災害 {year}",
+            ],
+            "助成金": [
+                f"助成金 中小企業 {ym}",
+                f"キャリアアップ助成金 {year}",
+                f"雇用調整助成金 緊急 {year}",
+            ],
+            "税制": [
+                f"中小企業 税制優遇 {year}",
+                f"賃上げ促進税制 {year}",
+                f"緊急 税制措置 {year}",
+            ],
+        }
+        for genre, qs in queries.items():
+            items = []
+            for q in qs:
+                r = search_google(q, google_api_key, google_cse_id, num=3)
+                if r:
+                    items.extend(r)
+                if len(items) >= 6:
+                    break
+            results[genre] = {"mode": "google", "items": items[:6]}
+    else:
+        print("Anthropic Web検索モードで各制度情報を取得中...")
+        queries = {
+            "融資": f"""日本の中小企業向け融資制度{ym}最新情報。
+                以下を詳しく：
+                ・通常の融資制度（日本政策金融公庫・信用保証協会）
+                ・緊急時対応融資（災害・パンデミック・地政学リスク対応）
+                ・中東情勢・原油高騰対応の特別融資
+                各制度の上限額・金利・対象者・申請条件・注意点を記載。""",
+            "補助金": f"""日本の中小企業向け補助金{ym}最新情報。
+                以下を詳しく：
+                ・通常の補助金（ものづくり・IT導入・持続化）
+                ・緊急時対応補助金（災害復旧・事業継続）
+                ・地政学リスク・原材料高騰対応補助金
+                各制度の上限額・補助率・要件・スケジュールを記載。""",
+            "助成金": f"""日本の中小企業向け助成金{ym}最新情報。
+                以下を詳しく：
+                ・通常の雇用助成金
+                ・緊急時対応助成金（雇用調整・事業継続）
+                ・物価高騰・経営危機対応助成金
+                各制度の支給額・要件・手続きを記載。""",
+            "税制": f"""日本の中小企業向け税制優遇{ym}最新情報。
+                以下を詳しく：
+                ・通常の税制優遇措置
+                ・緊急時対応税制（災害・パンデミック・経済危機時）
+                ・設備投資・賃上げ関連税制
+                各制度の控除率・要件・適用期限を記載。""",
+        }
+        for genre, q in queries.items():
+            print(f"{genre}を検索中...")
+            text = search_with_anthropic(client, model, q)
+            results[genre] = {"mode": "anthropic", "text": text}
+
+    return results
+
+def make_html_section(data):
+    if data["mode"] == "google":
+        items = data.get("items", [])
+        if not items:
+            return "<p style='color:#888;'>該当する新着情報がありませんでした。</p>"
+        html = ""
+        for item in items:
+            html += f"""<div style='border:1px solid #dde3f0;border-radius:6px;padding:14px;margin-bottom:12px;background:#fafbff;'>
 <div style='font-weight:bold;color:#0d1b4b;margin-bottom:6px;'>{item['title']}</div>
 <div style='font-size:0.88rem;color:#555;margin-bottom:8px;line-height:1.6;'>{item['snippet']}</div>
 <a href='{item['link']}' target='_blank' style='font-size:0.82rem;color:#2563eb;'>詳細を見る →</a>
 </div>"""
-    return html
+        return html
+    else:
+        text = data.get("text", "")
+        if not text:
+            return "<p style='color:#888;'>情報を取得できませんでした。</p>"
+        html = ""
+        for line in text.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith('###'):
+                line = line.lstrip('#').strip()
+                html += f"<h4 style='color:#0d1b4b;margin:14px 0 6px;font-size:0.95rem;'>{line}</h4>"
+            elif line.startswith('##') or line.startswith('#'):
+                line = line.lstrip('#').strip()
+                html += f"<h3 style='color:#0d1b4b;margin:16px 0 8px;font-size:1rem;border-left:3px solid #0d1b4b;padding-left:8px;'>{line}</h3>"
+            elif line.startswith(('・','•','-','*')):
+                html += f"<div style='padding:4px 0 4px 16px;font-size:0.9rem;color:#444;line-height:1.6;'>{line}</div>"
+            elif line.startswith('**'):
+                line = line.replace('**','').strip()
+                html += f"<div style='font-weight:bold;color:#0d1b4b;margin:10px 0 4px;'>{line}</div>"
+            else:
+                html += f"<p style='font-size:0.9rem;color:#444;line-height:1.7;margin-bottom:8px;'>{line}</p>"
+        return html
 
 def generate_report():
     api_key = get_clean_api_key()
     target_model = get_available_model(api_key)
     print(f"使用モデル: {target_model}")
-    news_dict = collect_latest_news()
+
+    client = anthropic.Anthropic(api_key=api_key)
     today_str = datetime.now().strftime("%Y年%m月%d日")
 
-    融資_html = make_cards(news_dict.get("融資", []))
-    補助金_html = make_cards(news_dict.get("補助金", []))
-    助成金_html = make_cards(news_dict.get("助成金", []))
-    税制_html = make_cards(news_dict.get("税制", []))
+    google_api_key = os.environ.get("GOOGLE_API_KEY", "")
+    google_cse_id = os.environ.get("GOOGLE_CSE_ID", "")
+    google_available = check_google_available(google_api_key, google_cse_id)
+    search_mode = "Google検索" if google_available else "AI Web検索"
+    print(f"検索モード: {search_mode}")
+
+    news = collect_all_news(client, target_model, google_available, google_api_key, google_cse_id)
+
+    世界情勢_html = make_html_section(news.get("世界情勢", {"mode":"anthropic","text":""}))
+    融資_html = make_html_section(news.get("融資", {"mode":"google","items":[]}))
+    補助金_html = make_html_section(news.get("補助金", {"mode":"google","items":[]}))
+    助成金_html = make_html_section(news.get("助成金", {"mode":"google","items":[]}))
+    税制_html = make_html_section(news.get("税制", {"mode":"google","items":[]}))
 
     html = f"""<!DOCTYPE html>
 <html lang="ja">
@@ -131,10 +237,11 @@ header h1{{font-size:1.4rem;}}
 .sr input{{flex:1;padding:10px 14px;border:1px solid #ccc;border-radius:4px;font-size:0.95rem;}}
 .sr button{{background:#0d1b4b;color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;font-size:0.95rem;}}
 #result{{margin-top:14px;padding:14px;background:#f8f9ff;border-left:4px solid #0d1b4b;border-radius:4px;display:none;white-space:pre-wrap;line-height:1.7;font-size:0.9rem;}}
-.em{{background:#fff0f0;border:2px solid #e53e3e;border-radius:8px;padding:14px 18px;margin:0 auto 16px;max-width:960px;}}
+.em{{background:#fff0f0;border:2px solid #e53e3e;border-radius:8px;padding:14px 18px;margin:0 auto 16px;max-width:960px;font-size:0.9rem;line-height:1.6;}}
 .et{{color:#e53e3e;font-weight:bold;margin-bottom:6px;}}
+.sm{{background:#fff8e1;border:2px solid #f39c12;border-radius:4px;padding:4px 10px;font-size:0.75rem;color:#856404;display:inline-block;margin-bottom:12px;}}
 .tabs{{max-width:960px;margin:0 auto;display:flex;gap:4px;flex-wrap:wrap;padding:0 4px;}}
-.tb{{background:#dde3f0;border:none;padding:10px 18px;border-radius:6px 6px 0 0;cursor:pointer;font-size:0.88rem;color:#555;}}
+.tb{{background:#dde3f0;border:none;padding:10px 16px;border-radius:6px 6px 0 0;cursor:pointer;font-size:0.85rem;color:#555;}}
 .tb.active{{background:#0d1b4b;color:white;}}
 .tc{{display:none;max-width:960px;margin:0 auto 30px;background:white;border-radius:0 8px 8px 8px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}}
 .tc h2{{font-size:1.2rem;color:#0d1b4b;border-left:4px solid #0d1b4b;padding-left:10px;margin-bottom:18px;}}
@@ -144,6 +251,8 @@ header h1{{font-size:1.4rem;}}
 .ab{{background:#f0f4ff;border-radius:6px;padding:16px;margin-bottom:14px;}}
 .ab h3{{color:#0d1b4b;margin-bottom:8px;}}
 .ab ul{{padding-left:18px;line-height:1.8;font-size:0.9rem;}}
+.world-alert{{background:#fff3cd;border:2px solid #f39c12;border-radius:8px;padding:16px;margin-bottom:16px;}}
+.world-alert-title{{color:#856404;font-weight:bold;margin-bottom:8px;font-size:1rem;}}
 </style>
 </head>
 <body>
@@ -158,7 +267,7 @@ header h1{{font-size:1.4rem;}}
 <div class="sb">
   <h2>🔍 AI制度検索</h2>
   <div class="sr">
-    <input type="text" id="qi" placeholder="制度名を入力して検索（例：ものづくり補助金）">
+    <input type="text" id="qi" placeholder="制度名・状況を入力（例：ものづくり補助金、パンデミック時の融資）">
     <button onclick="askAI()">AIに質問する</button>
   </div>
   <div id="result"></div>
@@ -172,16 +281,18 @@ header h1{{font-size:1.4rem;}}
 </div>
 
 <div class="tabs">
-  <button class="tb" id="b1" onclick="st(1)">①エグゼクティブサマリー</button>
-  <button class="tb" id="b2" onclick="st(2)">②融資（最重要）</button>
-  <button class="tb" id="b3" onclick="st(3)">③補助金</button>
-  <button class="tb" id="b4" onclick="st(4)">④助成金</button>
-  <button class="tb" id="b5" onclick="st(5)">⑤税制</button>
-  <button class="tb" id="b6" onclick="st(6)">⑥コンサルティング提言</button>
+  <button class="tb" id="b1" onclick="st(1)">①サマリー</button>
+  <button class="tb" id="b2" onclick="st(2)">🌍世界情勢</button>
+  <button class="tb" id="b3" onclick="st(3)">②融資（最重要）</button>
+  <button class="tb" id="b4" onclick="st(4)">③補助金</button>
+  <button class="tb" id="b5" onclick="st(5)">④助成金</button>
+  <button class="tb" id="b6" onclick="st(6)">⑤税制</button>
+  <button class="tb" id="b7" onclick="st(7)">⑥提言</button>
 </div>
 
 <div class="tc" id="t1">
   <h2>エグゼクティブサマリー</h2>
+  <div class="sm">検索モード：{search_mode}</div>
   <div class="sg">
     <div class="ss"><h3>🏦 融資（最重要）</h3>中東情勢対応のセーフティネット貸付要件緩和中。日本政策金融公庫・信用保証協会が対応。上限4,800万円。</div>
     <div class="ss"><h3>💰 補助金</h3>ものづくり補助金（上限4,000万円）・IT導入補助金（上限450万円）・小規模事業者持続化補助金（上限250万円）が公募中。</div>
@@ -191,41 +302,61 @@ header h1{{font-size:1.4rem;}}
 </div>
 
 <div class="tc" id="t2">
+  <h2>🌍 世界情勢・リスク分析</h2>
+  <div class="world-alert">
+    <div class="world-alert-title">⚡ 中小企業に影響する世界情勢（{today_str}時点）</div>
+    {世界情勢_html}
+  </div>
+</div>
+
+<div class="tc" id="t3">
   <h2>🏦 融資・資金繰り支援（最重要）</h2>
   {融資_html}
 </div>
 
-<div class="tc" id="t3">
+<div class="tc" id="t4">
   <h2>💰 補助金</h2>
   {補助金_html}
 </div>
 
-<div class="tc" id="t4">
+<div class="tc" id="t5">
   <h2>👥 助成金</h2>
   {助成金_html}
 </div>
 
-<div class="tc" id="t5">
+<div class="tc" id="t6">
   <h2>📊 税制優遇</h2>
   {税制_html}
 </div>
 
-<div class="tc" id="t6">
+<div class="tc" id="t7">
   <h2>💼 コンサルティング提言</h2>
   <div class="ab">
-    <h3>🚨 今すぐ確認すべき案件</h3>
+    <h3>🚨 世界情勢を踏まえた緊急対応</h3>
     <ul>
-      <li>中東情勢の影響を受けている顧客 → セーフティネット貸付（要件緩和中）を即座に提案</li>
-      <li>原材料・エネルギーコスト上昇の顧客 → 業務改善助成金と組み合わせて提案</li>
-      <li>設備投資を検討中の顧客 → ものづくり補助金＋経営強化税制の併用を検討</li>
+      <li>地政学リスク・原油高騰の影響を受けている顧客 → セーフティネット貸付（要件緩和中）を即座に提案</li>
+      <li>サプライチェーン混乱の顧客 → 緊急融資＋事業継続計画（BCP）の策定を支援</li>
+      <li>為替変動の影響を受けている顧客 → 為替リスクヘッジ＋運転資金融資を提案</li>
+      <li>パンデミック・災害リスクに備える顧客 → 雇用調整助成金の事前確認を推奨</li>
     </ul>
   </div>
   <div class="ab">
     <h3>📋 今月の重点提案項目</h3>
     <ul>
       <li>賃上げ実施予定の顧客 → 賃上げ促進税制＋キャリアアップ助成金を同時提案</li>
-      <li>IT化・DX推進の顧客 → IT導入補助金＋経営強化税制（ソフトウェア）の併用</li>
+      <li>IT化・DX推進の顧客 → IT導入補助金＋経営強化税制の併用</li>
+      <li>設備投資を検討中の顧客 → ものづくり補助金＋経営強化税制の併用を検討</li>
       <li>採用・人材育成の顧客 → 人材開発支援助成金＋両立支援助成金を確認</li>
+    </ul>
+  </div>
+  <div class="ab">
+    <h3>🌍 世界情勢別・緊急支援制度早見表</h3>
+    <ul>
+      <li>【戦争・地政学リスク】セーフティネット貸付・緊急経営安定化特別融資</li>
+      <li>【パンデミック】雇用調整助成金・無利子無担保融資・持続化給付金（発動時）</li>
+      <li>【自然災害】災害復旧貸付・激甚災害指定補助金・被災者雇用開発助成金</li>
+      <li>【経済危機・恐慌】セーフティネット保証・経営改善計画策定支援（405事業）</li>
+      <li>【原油・原材料高騰】業務改善助成金・省エネ補助金・価格転嫁対策</li>
     </ul>
   </div>
   <div class="ab">
@@ -233,14 +364,14 @@ header h1{{font-size:1.4rem;}}
     <ul>
       <li>本レポートの情報は{today_str}時点のものです</li>
       <li>申請要件・金額は変更される場合があります。必ず公式サイトで最新情報を確認してください</li>
-      <li>補助金・助成金は原則として事前申請が必要です</li>
+      <li>緊急時の特別措置は状況により随時変更されます。速報性の高い情報収集を推奨します</li>
     </ul>
   </div>
 </div>
 
 <script>
-function st(n) {{
-  for(var i=1;i<=6;i++){{
+function st(n){{
+  for(var i=1;i<=7;i++){{
     document.getElementById('t'+i).style.display='none';
     document.getElementById('b'+i).classList.remove('active');
   }}
@@ -250,7 +381,7 @@ function st(n) {{
 document.addEventListener('DOMContentLoaded',function(){{st(1);}});
 async function askAI(){{
   var q=document.getElementById('qi').value.trim();
-  if(!q){{alert('制度名を入力してください');return;}}
+  if(!q){{alert('制度名または状況を入力してください');return;}}
   var el=document.getElementById('result');
   el.style.display='block';
   el.textContent='AIが調査中...';
@@ -258,7 +389,7 @@ async function askAI(){{
     var r=await fetch('https://api.anthropic.com/v1/messages',{{
       method:'POST',
       headers:{{'Content-Type':'application/json','x-api-key':'{api_key}','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}},
-      body:JSON.stringify({{model:'{target_model}',max_tokens:1000,messages:[{{role:'user',content:'中小企業の財務コンサルタントとして、次の制度について詳しく教えてください。対象者・金額・申請条件・注意点・申請窓口を箇条書きで: '+q}}]}})
+      body:JSON.stringify({{model:'{target_model}',max_tokens:1500,messages:[{{role:'user',content:'中小企業の財務コンサルタントとして、次の質問に詳しく答えてください。世界情勢（戦争・災害・パンデミック・経済危機等）も考慮した上で、活用できる融資・補助金・助成金・税制優遇を具体的に教えてください。対象者・金額・申請条件・注意点も含めて: '+q}}]}})
     }});
     var d=await r.json();
     el.textContent=d.content&&d.content[0]?d.content[0].text:'回答を取得できませんでした。';
