@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 import anthropic
 import sys
@@ -19,7 +20,7 @@ def get_available_model(api_key):
         response = requests.get(url, headers=headers, timeout=15)
         if response.status_code == 200:
             models = [m['id'] for m in response.json().get('data', [])]
-            for p in ["claude-sonnet-4-5", "claude-haiku-4-5", "claude-3-5-sonnet-20241022"]:
+            for p in ["claude-haiku-4-5", "claude-3-5-sonnet-20241022", "claude-sonnet-4-5"]:
                 if p in models:
                     return p
             return models[0] if models else "claude-haiku-4-5"
@@ -42,10 +43,11 @@ def search_google(query, api_key, cse_id, num=3):
     return []
 
 def search_with_anthropic(client, model, query):
+    time.sleep(15)  # 15秒待機してレート制限を回避
     try:
         response = client.messages.create(
             model=model,
-            max_tokens=2000,
+            max_tokens=1500,
             tools=[{"type": "web_search_20250305", "name": "web_search"}],
             messages=[{"role": "user", "content": query}]
         )
@@ -74,15 +76,7 @@ def collect_all_news(client, model, google_available, google_api_key, google_cse
 
     print("世界情勢・緊急事態を調査中...")
     世界情勢_text = search_with_anthropic(client, model,
-        f"""現在（{ym}）の世界情勢で、日本の中小企業に影響を与える可能性がある重大な出来事を調査してください。
-以下の観点で調べてください：
-1. 戦争・地政学リスク（中東・ウクライナ・台湾海峡等）
-2. 自然災害・パンデミックリスク
-3. 金融危機・世界恐慌リスク
-4. 原油・エネルギー価格動向
-5. 為替・金利動向
-6. サプライチェーン混乱
-各項目について、日本の中小企業への具体的な影響と対応策を簡潔にまとめてください。""")
+        f"現在（{ym}）の世界情勢で日本の中小企業に影響する出来事を調査。戦争・地政学リスク・災害・パンデミック・金融危機・原油価格・為替・サプライチェーンについて、中小企業への影響と対応策を簡潔にまとめてください。")
     results["世界情勢"] = {"mode": "anthropic", "text": 世界情勢_text}
 
     if google_available:
@@ -98,17 +92,15 @@ def collect_all_news(client, model, google_available, google_api_key, google_cse
                 f"補助金 公募 中小企業 {ym}",
                 f"ものづくり補助金 {year}",
                 f"IT導入補助金 {year}",
-                f"緊急 補助金 災害 {year}",
             ],
             "助成金": [
                 f"助成金 中小企業 {ym}",
                 f"キャリアアップ助成金 {year}",
-                f"雇用調整助成金 緊急 {year}",
+                f"雇用調整助成金 {year}",
             ],
             "税制": [
                 f"中小企業 税制優遇 {year}",
                 f"賃上げ促進税制 {year}",
-                f"緊急 税制措置 {year}",
             ],
         }
         for genre, qs in queries.items():
@@ -122,48 +114,25 @@ def collect_all_news(client, model, google_available, google_api_key, google_cse
             results[genre] = {"mode": "google", "items": items[:6]}
     else:
         print("Anthropic Web検索モードで各制度情報を取得中...")
-        now = datetime.now()
-        year = now.year
-        ym = now.strftime("%Y年%m月")
 
         print("融資情報を検索中...")
         融資_text = search_with_anthropic(client, model,
-            f"""日本の中小企業向け融資制度{ym}最新情報。
-以下を詳しく教えてください：
-・通常の融資制度（日本政策金融公庫・信用保証協会・セーフティネット貸付）
-・緊急時対応融資（災害・パンデミック・地政学リスク対応）
-・中東情勢・原油高騰対応の特別融資
-各制度の上限額・金利・返済期間・対象者・申請条件・注意点・申請窓口を具体的に記載してください。""")
+            f"日本の中小企業向け融資制度{ym}最新情報。セーフティネット貸付・日本政策金融公庫・信用保証協会・緊急融資の上限額・金利・対象者・条件を教えてください。")
         results["融資"] = {"mode": "anthropic", "text": 融資_text}
 
         print("補助金情報を検索中...")
         補助金_text = search_with_anthropic(client, model,
-            f"""日本の中小企業向け補助金{ym}最新情報。
-以下を詳しく教えてください：
-・ものづくり補助金・IT導入補助金・小規模事業者持続化補助金・省力化投資補助金
-・緊急時対応補助金（災害復旧・事業継続・BCP対策）
-・地政学リスク・原材料高騰対応補助金
-各制度の上限額・補助率・対象者・対象経費・申請要件・スケジュール・注意点を具体的に記載してください。""")
+            f"日本の中小企業向け補助金{ym}最新情報。ものづくり補助金・IT導入補助金・持続化補助金・省力化補助金の上限額・補助率・要件を教えてください。")
         results["補助金"] = {"mode": "anthropic", "text": 補助金_text}
 
         print("助成金情報を検索中...")
         助成金_text = search_with_anthropic(client, model,
-            f"""日本の中小企業向け助成金{ym}最新情報。
-以下を詳しく教えてください：
-・キャリアアップ助成金・業務改善助成金・人材開発支援助成金・両立支援助成金
-・緊急時対応助成金（雇用調整助成金・事業継続雇用確保助成金）
-・物価高騰・経営危機対応助成金
-各制度の支給額・対象者・受給要件・申請手続き・注意点を具体的に記載してください。""")
+            f"日本の中小企業向け助成金{ym}最新情報。キャリアアップ助成金・業務改善助成金・人材開発支援助成金・雇用調整助成金の支給額・要件を教えてください。")
         results["助成金"] = {"mode": "anthropic", "text": 助成金_text}
 
         print("税制情報を検索中...")
         税制_text = search_with_anthropic(client, model,
-            f"""日本の中小企業向け税制優遇{ym}最新情報。
-以下を詳しく教えてください：
-・賃上げ促進税制・中小企業経営強化税制・研究開発税制・投資促進税制
-・緊急時対応税制（災害・パンデミック・経済危機時の特別措置）
-・設備投資・DX関連税制
-各制度の控除額・税額控除率・対象者・適用要件・申請方法・期限を具体的に記載してください。""")
+            f"日本の中小企業向け税制優遇{ym}最新情報。賃上げ促進税制・経営強化税制・研究開発税制・投資促進税制の控除率・要件・期限を教えてください。")
         results["税制"] = {"mode": "anthropic", "text": 税制_text}
 
     return results
@@ -401,7 +370,7 @@ async function askAI(){{
     var r=await fetch('https://api.anthropic.com/v1/messages',{{
       method:'POST',
       headers:{{'Content-Type':'application/json','x-api-key':'{api_key}','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}},
-      body:JSON.stringify({{model:'{target_model}',max_tokens:1500,messages:[{{role:'user',content:'中小企業の財務コンサルタントとして、次の質問に詳しく答えてください。世界情勢（戦争・災害・パンデミック・経済危機等）も考慮した上で、活用できる融資・補助金・助成金・税制優遇を具体的に教えてください。対象者・金額・申請条件・注意点も含めて: '+q}}]}})
+      body:JSON.stringify({{model:'{target_model}',max_tokens:1500,messages:[{{role:'user',content:'中小企業の財務コンサルタントとして、次の質問に詳しく答えてください。世界情勢（戦争・災害・パンデミック・経済危機等）も考慮した上で、活用できる融資・補助金・助成金・税制優遇を具体的に教えてください: '+q}}]}})
     }});
     var d=await r.json();
     el.textContent=d.content&&d.content[0]?d.content[0].text:'回答を取得できませんでした。';
