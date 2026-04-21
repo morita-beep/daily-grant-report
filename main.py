@@ -13,9 +13,6 @@ def get_clean_api_key():
         sys.exit(1)
     return clean
 
-def get_available_model(api_key):
-    return "claude-haiku-4-5"
-
 def search_google(query, api_key, cse_id, num=3):
     url = "https://www.googleapis.com/customsearch/v1"
     params = {"q": query, "key": api_key, "cx": cse_id, "num": num, "lr": "lang_ja", "dateRestrict": "m1"}
@@ -24,72 +21,50 @@ def search_google(query, api_key, cse_id, num=3):
         if response.status_code == 200:
             return [{"title": i.get("title",""), "snippet": i.get("snippet",""), "link": i.get("link","")} for i in response.json().get("items", [])]
         elif response.status_code in [429, 403]:
-            print("Google検索上限超過 → Anthropic Web検索に切り替えます")
             return None
     except Exception as e:
         print(f"Google検索エラー: {e}")
     return []
 
-def search_with_anthropic(client, model, query):
-    time.sleep(60)
+def ask_claude(client, query):
+    """web_searchなしでClaudeの知識だけで回答（低コスト）"""
+    time.sleep(5)
     try:
         response = client.messages.create(
-            model=model,
-            max_tokens=1500,
-            tools=[{"type": "web_search_20250305", "name": "web_search"}],
+            model="claude-haiku-4-5",
+            max_tokens=500,
             messages=[{"role": "user", "content": query}]
         )
-        result = ""
-        for block in response.content:
-            if hasattr(block, 'text'):
-                result += block.text
-        return result
+        return response.content[0].text
     except Exception as e:
-        print(f"Anthropic検索エラー: {e}")
+        print(f"Claude呼び出しエラー: {e}")
         return ""
 
 def check_google_available(google_api_key, google_cse_id):
     if not google_api_key or not google_cse_id:
         return False
     test = search_google("中小企業 融資", google_api_key, google_cse_id, num=1)
-    if test is None:
-        return False
-    return True
+    return test is not None and test != []
 
-def collect_all_news(client, model, google_available, google_api_key, google_cse_id):
+def collect_all_news(client, google_available, google_api_key, google_cse_id):
     now = datetime.now()
     year = now.year
     ym = now.strftime("%Y年%m月")
     results = {}
 
-    print("世界情勢・緊急事態を調査中...")
-    世界情勢_text = search_with_anthropic(client, model,
-        f"現在（{ym}）の世界情勢で日本の中小企業に影響する出来事を調査。戦争・地政学リスク・災害・パンデミック・金融危機・原油価格・為替・サプライチェーンについて、中小企業への影響と対応策を簡潔にまとめてください。")
+    # 世界情勢はClaudeの知識で回答（web_search不使用）
+    print("世界情勢を調査中...")
+    世界情勢_text = ask_claude(client,
+        f"{ym}時点の世界情勢で日本の中小企業に影響する主要リスクを箇条書きで教えてください。戦争・災害・パンデミック・金融危機・原油・為替について各2行以内で。")
     results["世界情勢"] = {"mode": "anthropic", "text": 世界情勢_text}
 
     if google_available:
-        print("Google検索モードで各制度情報を取得中...")
+        print("Google検索モードで実行中（無料）...")
         queries = {
-            "融資": [
-                f"中小企業 緊急融資 資金繰り {ym}",
-                f"セーフティネット貸付 {year} 最新",
-                "中東情勢 災害 融資 中小企業 緊急支援",
-                f"日本政策金融公庫 {year} 新制度",
-            ],
-            "補助金": [
-                f"補助金 公募 中小企業 {ym}",
-                f"ものづくり補助金 {year}",
-                f"IT導入補助金 {year}",
-            ],
-            "助成金": [
-                f"助成金 中小企業 {ym}",
-                f"キャリアアップ助成金 {year}",
-                f"雇用調整助成金 {year}",
-            ],
-            "税制": [
-                f"中小企業 税制優遇 {year}",
-                f"賃上げ促進税制 {year}",
-            ],
+            "融資": [f"中小企業 融資 {ym}", f"セーフティネット貸付 {year}"],
+            "補助金": [f"補助金 公募 中小企業 {ym}", f"ものづくり補助金 {year}"],
+            "助成金": [f"助成金 中小企業 {ym}", f"キャリアアップ助成金 {year}"],
+            "税制": [f"中小企業 税制 {year}", f"賃上げ促進税制 {year}"],
         }
         for genre, qs in queries.items():
             items = []
@@ -97,31 +72,21 @@ def collect_all_news(client, model, google_available, google_api_key, google_cse
                 r = search_google(q, google_api_key, google_cse_id, num=3)
                 if r:
                     items.extend(r)
-                if len(items) >= 6:
+                if len(items) >= 4:
                     break
-            results[genre] = {"mode": "google", "items": items[:6]}
+            results[genre] = {"mode": "google", "items": items[:4]}
     else:
-        print("Anthropic Web検索モードで各制度情報を取得中...")
-
-        print("融資情報を検索中...")
-        融資_text = search_with_anthropic(client, model,
-            f"日本の中小企業向け融資制度{ym}最新情報。セーフティネット貸付・日本政策金融公庫・信用保証協会・緊急融資の上限額・金利・対象者・条件を教えてください。")
-        results["融資"] = {"mode": "anthropic", "text": 融資_text}
-
-        print("補助金情報を検索中...")
-        補助金_text = search_with_anthropic(client, model,
-            f"日本の中小企業向け補助金{ym}最新情報。ものづくり補助金・IT導入補助金・持続化補助金・省力化補助金の上限額・補助率・要件を教えてください。")
-        results["補助金"] = {"mode": "anthropic", "text": 補助金_text}
-
-        print("助成金情報を検索中...")
-        助成金_text = search_with_anthropic(client, model,
-            f"日本の中小企業向け助成金{ym}最新情報。キャリアアップ助成金・業務改善助成金・人材開発支援助成金・雇用調整助成金の支給額・要件を教えてください。")
-        results["助成金"] = {"mode": "anthropic", "text": 助成金_text}
-
-        print("税制情報を検索中...")
-        税制_text = search_with_anthropic(client, model,
-            f"日本の中小企業向け税制優遇{ym}最新情報。賃上げ促進税制・経営強化税制・研究開発税制・投資促進税制の控除率・要件・期限を教えてください。")
-        results["税制"] = {"mode": "anthropic", "text": 税制_text}
+        print("Claudeの知識モードで実行中（低コスト）...")
+        genres = {
+            "融資": f"{ym}の日本の中小企業向け主要融資制度を箇条書きで。制度名・上限額・金利・対象を各1行で5件。",
+            "補助金": f"{ym}の日本の中小企業向け主要補助金を箇条書きで。制度名・上限額・補助率・要件を各1行で5件。",
+            "助成金": f"{ym}の日本の中小企業向け主要助成金を箇条書きで。制度名・支給額・要件を各1行で5件。",
+            "税制": f"{ym}の日本の中小企業向け主要税制優遇を箇条書きで。制度名・控除率・要件を各1行で5件。",
+        }
+        for genre, query in genres.items():
+            print(f"{genre}情報を取得中...")
+            text = ask_claude(client, query)
+            results[genre] = {"mode": "anthropic", "text": text}
 
     return results
 
@@ -147,37 +112,29 @@ def make_html_section(data):
             line = line.strip()
             if not line:
                 continue
-            if line.startswith('###'):
-                line = line.lstrip('#').strip()
-                html += f"<h4 style='color:#0d1b4b;margin:14px 0 6px;font-size:0.95rem;'>{line}</h4>"
-            elif line.startswith('##') or line.startswith('#'):
+            if line.startswith(('・','•','-','*')):
+                html += f"<div style='padding:4px 0 4px 16px;font-size:0.9rem;color:#444;line-height:1.6;border-bottom:1px solid #eee;'>{line}</div>"
+            elif line.startswith('#'):
                 line = line.lstrip('#').strip()
                 html += f"<h3 style='color:#0d1b4b;margin:16px 0 8px;font-size:1rem;border-left:3px solid #0d1b4b;padding-left:8px;'>{line}</h3>"
-            elif line.startswith(('・','•','-','*')):
-                html += f"<div style='padding:4px 0 4px 16px;font-size:0.9rem;color:#444;line-height:1.6;'>{line}</div>"
-            elif line.startswith('**'):
-                line = line.replace('**','').strip()
-                html += f"<div style='font-weight:bold;color:#0d1b4b;margin:10px 0 4px;'>{line}</div>"
             else:
                 html += f"<p style='font-size:0.9rem;color:#444;line-height:1.7;margin-bottom:8px;'>{line}</p>"
         return html
 
 def generate_report():
     api_key = get_clean_api_key()
-    target_model = get_available_model(api_key)
-    print(f"使用モデル: {target_model}")
+    print("使用モデル: claude-haiku-4-5（低コストモード）")
 
     client = anthropic.Anthropic(api_key=api_key)
     today_str = datetime.now().strftime("%Y年%m月%d日")
 
     google_api_key = os.environ.get("GOOGLE_API_KEY", "")
     google_cse_id = os.environ.get("GOOGLE_CSE_ID", "")
-
-    google_available = False
-    search_mode = "AI Web検索"
+    google_available = check_google_available(google_api_key, google_cse_id)
+    search_mode = "Google検索（無料）" if google_available else "AI知識モード"
     print(f"検索モード: {search_mode}")
 
-    news = collect_all_news(client, target_model, google_available, google_api_key, google_cse_id)
+    news = collect_all_news(client, google_available, google_api_key, google_cse_id)
 
     世界情勢_html = make_html_section(news.get("世界情勢", {"mode":"anthropic","text":""}))
     融資_html = make_html_section(news.get("融資", {"mode":"anthropic","text":""}))
@@ -357,7 +314,7 @@ async function askAI(){{
     var r=await fetch('https://api.anthropic.com/v1/messages',{{
       method:'POST',
       headers:{{'Content-Type':'application/json','x-api-key':'{api_key}','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}},
-      body:JSON.stringify({{model:'{target_model}',max_tokens:1500,messages:[{{role:'user',content:'中小企業の財務コンサルタントとして、次の質問に詳しく答えてください。世界情勢（戦争・災害・パンデミック・経済危機等）も考慮した上で、活用できる融資・補助金・助成金・税制優遇を具体的に教えてください: '+q}}]}})
+      body:JSON.stringify({{model:'claude-haiku-4-5',max_tokens:800,messages:[{{role:'user',content:'中小企業の財務コンサルタントとして簡潔に答えてください。融資・補助金・助成金・税制優遇で使える制度を箇条書きで: '+q}}]}})
     }});
     var d=await r.json();
     el.textContent=d.content&&d.content[0]?d.content[0].text:'回答を取得できませんでした。';
