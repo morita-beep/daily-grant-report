@@ -43,7 +43,7 @@ def search_google(query, api_key, cse_id, num=3):
     return []
 
 def search_with_anthropic(client, model, query):
-    time.sleep(15)  # 15秒待機してレート制限を回避
+    time.sleep(30)  # 15秒待機してレート制限を回避
     try:
         response = client.messages.create(
             model=model,
