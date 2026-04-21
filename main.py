@@ -72,20 +72,17 @@ def collect_all_news(client, model, google_available, google_api_key, google_cse
     ym = now.strftime("%Y年%m月")
     results = {}
 
-    # ==========================================
-    # 世界情勢・緊急事態の検索（常にAnthropicを使用）
-    # ==========================================
     print("世界情勢・緊急事態を調査中...")
     世界情勢_text = search_with_anthropic(client, model,
         f"""現在（{ym}）の世界情勢で、日本の中小企業に影響を与える可能性がある重大な出来事を調査してください。
-        以下の観点で調べてください：
-        1. 戦争・地政学リスク（中東・ウクライナ・台湾海峡等）
-        2. 自然災害・パンデミックリスク
-        3. 金融危機・世界恐慌リスク
-        4. 原油・エネルギー価格動向
-        5. 為替・金利動向
-        6. サプライチェーン混乱
-        各項目について、日本の中小企業への具体的な影響と対応策を簡潔にまとめてください。""")
+以下の観点で調べてください：
+1. 戦争・地政学リスク（中東・ウクライナ・台湾海峡等）
+2. 自然災害・パンデミックリスク
+3. 金融危機・世界恐慌リスク
+4. 原油・エネルギー価格動向
+5. 為替・金利動向
+6. サプライチェーン混乱
+各項目について、日本の中小企業への具体的な影響と対応策を簡潔にまとめてください。""")
     results["世界情勢"] = {"mode": "anthropic", "text": 世界情勢_text}
 
     if google_available:
@@ -125,36 +122,49 @@ def collect_all_news(client, model, google_available, google_api_key, google_cse
             results[genre] = {"mode": "google", "items": items[:6]}
     else:
         print("Anthropic Web検索モードで各制度情報を取得中...")
-        queries = {
-            "融資": f"""日本の中小企業向け融資制度{ym}最新情報。
-                以下を詳しく：
-                ・通常の融資制度（日本政策金融公庫・信用保証協会）
-                ・緊急時対応融資（災害・パンデミック・地政学リスク対応）
-                ・中東情勢・原油高騰対応の特別融資
-                各制度の上限額・金利・対象者・申請条件・注意点を記載。""",
-            "補助金": f"""日本の中小企業向け補助金{ym}最新情報。
-                以下を詳しく：
-                ・通常の補助金（ものづくり・IT導入・持続化）
-                ・緊急時対応補助金（災害復旧・事業継続）
-                ・地政学リスク・原材料高騰対応補助金
-                各制度の上限額・補助率・要件・スケジュールを記載。""",
-            "助成金": f"""日本の中小企業向け助成金{ym}最新情報。
-                以下を詳しく：
-                ・通常の雇用助成金
-                ・緊急時対応助成金（雇用調整・事業継続）
-                ・物価高騰・経営危機対応助成金
-                各制度の支給額・要件・手続きを記載。""",
-            "税制": f"""日本の中小企業向け税制優遇{ym}最新情報。
-                以下を詳しく：
-                ・通常の税制優遇措置
-                ・緊急時対応税制（災害・パンデミック・経済危機時）
-                ・設備投資・賃上げ関連税制
-                各制度の控除率・要件・適用期限を記載。""",
-        }
-        for genre, q in queries.items():
-            print(f"{genre}を検索中...")
-            text = search_with_anthropic(client, model, q)
-            results[genre] = {"mode": "anthropic", "text": text}
+        now = datetime.now()
+        year = now.year
+        ym = now.strftime("%Y年%m月")
+
+        print("融資情報を検索中...")
+        融資_text = search_with_anthropic(client, model,
+            f"""日本の中小企業向け融資制度{ym}最新情報。
+以下を詳しく教えてください：
+・通常の融資制度（日本政策金融公庫・信用保証協会・セーフティネット貸付）
+・緊急時対応融資（災害・パンデミック・地政学リスク対応）
+・中東情勢・原油高騰対応の特別融資
+各制度の上限額・金利・返済期間・対象者・申請条件・注意点・申請窓口を具体的に記載してください。""")
+        results["融資"] = {"mode": "anthropic", "text": 融資_text}
+
+        print("補助金情報を検索中...")
+        補助金_text = search_with_anthropic(client, model,
+            f"""日本の中小企業向け補助金{ym}最新情報。
+以下を詳しく教えてください：
+・ものづくり補助金・IT導入補助金・小規模事業者持続化補助金・省力化投資補助金
+・緊急時対応補助金（災害復旧・事業継続・BCP対策）
+・地政学リスク・原材料高騰対応補助金
+各制度の上限額・補助率・対象者・対象経費・申請要件・スケジュール・注意点を具体的に記載してください。""")
+        results["補助金"] = {"mode": "anthropic", "text": 補助金_text}
+
+        print("助成金情報を検索中...")
+        助成金_text = search_with_anthropic(client, model,
+            f"""日本の中小企業向け助成金{ym}最新情報。
+以下を詳しく教えてください：
+・キャリアアップ助成金・業務改善助成金・人材開発支援助成金・両立支援助成金
+・緊急時対応助成金（雇用調整助成金・事業継続雇用確保助成金）
+・物価高騰・経営危機対応助成金
+各制度の支給額・対象者・受給要件・申請手続き・注意点を具体的に記載してください。""")
+        results["助成金"] = {"mode": "anthropic", "text": 助成金_text}
+
+        print("税制情報を検索中...")
+        税制_text = search_with_anthropic(client, model,
+            f"""日本の中小企業向け税制優遇{ym}最新情報。
+以下を詳しく教えてください：
+・賃上げ促進税制・中小企業経営強化税制・研究開発税制・投資促進税制
+・緊急時対応税制（災害・パンデミック・経済危機時の特別措置）
+・設備投資・DX関連税制
+各制度の控除額・税額控除率・対象者・適用要件・申請方法・期限を具体的に記載してください。""")
+        results["税制"] = {"mode": "anthropic", "text": 税制_text}
 
     return results
 
@@ -205,17 +215,19 @@ def generate_report():
 
     google_api_key = os.environ.get("GOOGLE_API_KEY", "")
     google_cse_id = os.environ.get("GOOGLE_CSE_ID", "")
-    google_available = check_google_available(google_api_key, google_cse_id)
-    search_mode = "Google検索" if google_available else "AI Web検索"
+
+    # Google上限超過のため強制的にAnthropicモード
+    google_available = False
+    search_mode = "AI Web検索"
     print(f"検索モード: {search_mode}")
 
     news = collect_all_news(client, target_model, google_available, google_api_key, google_cse_id)
 
     世界情勢_html = make_html_section(news.get("世界情勢", {"mode":"anthropic","text":""}))
-    融資_html = make_html_section(news.get("融資", {"mode":"google","items":[]}))
-    補助金_html = make_html_section(news.get("補助金", {"mode":"google","items":[]}))
-    助成金_html = make_html_section(news.get("助成金", {"mode":"google","items":[]}))
-    税制_html = make_html_section(news.get("税制", {"mode":"google","items":[]}))
+    融資_html = make_html_section(news.get("融資", {"mode":"anthropic","text":""}))
+    補助金_html = make_html_section(news.get("補助金", {"mode":"anthropic","text":""}))
+    助成金_html = make_html_section(news.get("助成金", {"mode":"anthropic","text":""}))
+    税制_html = make_html_section(news.get("税制", {"mode":"anthropic","text":""}))
 
     html = f"""<!DOCTYPE html>
 <html lang="ja">
@@ -239,7 +251,7 @@ header h1{{font-size:1.4rem;}}
 #result{{margin-top:14px;padding:14px;background:#f8f9ff;border-left:4px solid #0d1b4b;border-radius:4px;display:none;white-space:pre-wrap;line-height:1.7;font-size:0.9rem;}}
 .em{{background:#fff0f0;border:2px solid #e53e3e;border-radius:8px;padding:14px 18px;margin:0 auto 16px;max-width:960px;font-size:0.9rem;line-height:1.6;}}
 .et{{color:#e53e3e;font-weight:bold;margin-bottom:6px;}}
-.sm{{background:#fff8e1;border:2px solid #f39c12;border-radius:4px;padding:4px 10px;font-size:0.75rem;color:#856404;display:inline-block;margin-bottom:12px;}}
+.sm{{background:#e8f4f8;border:1px solid #bee3f8;border-radius:4px;padding:4px 10px;font-size:0.75rem;color:#2c5282;display:inline-block;margin-bottom:12px;}}
 .tabs{{max-width:960px;margin:0 auto;display:flex;gap:4px;flex-wrap:wrap;padding:0 4px;}}
 .tb{{background:#dde3f0;border:none;padding:10px 16px;border-radius:6px 6px 0 0;cursor:pointer;font-size:0.85rem;color:#555;}}
 .tb.active{{background:#0d1b4b;color:white;}}
@@ -292,7 +304,7 @@ header h1{{font-size:1.4rem;}}
 
 <div class="tc" id="t1">
   <h2>エグゼクティブサマリー</h2>
-  <div class="sm">検索モード：{search_mode}</div>
+  <div class="sm">🤖 検索モード：{search_mode}</div>
   <div class="sg">
     <div class="ss"><h3>🏦 融資（最重要）</h3>中東情勢対応のセーフティネット貸付要件緩和中。日本政策金融公庫・信用保証協会が対応。上限4,800万円。</div>
     <div class="ss"><h3>💰 補助金</h3>ものづくり補助金（上限4,000万円）・IT導入補助金（上限450万円）・小規模事業者持続化補助金（上限250万円）が公募中。</div>
