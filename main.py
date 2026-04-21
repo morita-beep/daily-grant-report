@@ -125,6 +125,7 @@ def collect_all_news(client, model, google_available, google_api_key, google_cse
             f"日本の中小企業向け補助金{ym}最新情報。ものづくり補助金・IT導入補助金・持続化補助金・省力化補助金の上限額・補助率・要件を教えてください。")
         results["補助金"] = {"mode": "anthropic", "text": 補助金_text}
 
+        time.sleep(30)
         print("助成金情報を検索中...")
         助成金_text = search_with_anthropic(client, model,
             f"日本の中小企業向け助成金{ym}最新情報。キャリアアップ助成金・業務改善助成金・人材開発支援助成金・雇用調整助成金の支給額・要件を教えてください。")
